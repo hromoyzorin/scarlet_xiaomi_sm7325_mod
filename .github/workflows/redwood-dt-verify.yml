@@ -1,0 +1,74 @@
+name: Redwood DTB and DTBO verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gpu-common-pwrlevels
+    paths:
+      - "arch/arm64/boot/dts/vendor/qcom/**"
+      - "arch/arm64/configs/vendor/**"
+      - ".github/workflows/redwood-dt-verify.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-dt:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout kernel sources
+        uses: actions/checkout@v4
+        with:
+          ref: gpu-common-pwrlevels
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /Makefile
+            /Kbuild
+            /Kconfig
+            /scripts/
+            /include/
+            /arch/arm64/
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex build-essential libssl-dev libelf-dev device-tree-compiler python3
+
+      - name: Configure Redwood kernel
+        run: |
+          make O=out ARCH=arm64 vendor/xiaomi-qgki_defconfig
+          scripts/kconfig/merge_config.sh -m -O out out/.config arch/arm64/configs/vendor/redwood.config
+          make O=out ARCH=arm64 olddefconfig
+          grep -E '^(CONFIG_ARCH_YUPIK|CONFIG_BUILD_ARM64_DT_OVERLAY|CONFIG_MACH_XIAOMI|CONFIG_MACH_XIAOMI_REDWOOD)=' out/.config
+
+      - name: Build base DTB and Redwood overlay
+        run: |
+          make O=out ARCH=arm64 -j2 \
+            arch/arm64/boot/dts/vendor/qcom/yupik.dtb \
+            arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
+
+      - name: Decompile and validate GPU power-level tree
+        run: |
+          dtc -I dtb -O dts -o out/yupik.dec.dts out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
+          grep -Fq 'qcom,gpu-pwrlevels {' out/yupik.dec.dts
+          ! grep -Eq '^[[:space:]]*qcom,gpu-pwrlevel-bins[[:space:]]*\{' out/yupik.dec.dts
+          grep -Fq 'qcom,gpu-pwrlevel-bins-disabled {' out/yupik.dec.dts
+          grep -Fq 'qcom,speed-bin = <0x75>' out/yupik.dec.dts
+          grep -Fq 'qcom,initial-pwrlevel = <0x2>' out/yupik.dec.dts
+          test -s out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
+          echo "GPU common table, disabled bin selector, speed-bin 117 and initial level 2 verified."
+
+      - name: Upload DTB, DTBO and decompiled tree
+        uses: actions/upload-artifact@v4
+        with:
+          name: redwood-gpu-dtb-validation
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
+            out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
+            out/yupik.dec.dts
+            out/.config
