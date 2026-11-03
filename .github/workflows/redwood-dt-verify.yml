@@ -48,11 +48,30 @@ jobs:
       - name: Decompile and validate GPU power-level tree
         run: |
           dtc -I dtb -O dts -o out/yupik.dec.dts out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
-          grep -Fq 'qcom,gpu-pwrlevels {' out/yupik.dec.dts
-          ! grep -Fq 'qcom,gpu-pwrlevel-bins {' out/yupik.dec.dts
-          grep -Fq 'qcom,gpu-pwrlevel-bins-disabled {' out/yupik.dec.dts
-          grep -Fq 'qcom,speed-bin = <0x75>' out/yupik.dec.dts
-          grep -Fq 'qcom,initial-pwrlevel = <0x2>' out/yupik.dec.dts
+          echo "=== GPU-related properties in compiled DTB ==="
+          grep -nE 'qcom,(gpu-pwrlevels|gpu-pwrlevel-bins|speed-bin|initial-pwrlevel)' out/yupik.dec.dts || true
+
+          check() {
+            label="$1"
+            pattern="$2"
+            if grep -Eq "$pattern" out/yupik.dec.dts; then
+              echo "PASS: $label"
+            else
+              echo "FAIL: $label"
+              return 1
+            fi
+          }
+
+          check "legacy common GPU power-level table exists" 'qcom,gpu-pwrlevels[[:space:]]*\{'
+          if grep -Eq 'qcom,gpu-pwrlevel-bins[[:space:]]*\{' out/yupik.dec.dts; then
+            echo "FAIL: active speed-bin selector still exists"
+            exit 1
+          else
+            echo "PASS: active speed-bin selector is absent"
+          fi
+          check "renamed speed-bin node exists" 'qcom,gpu-pwrlevel-bins-disabled[[:space:]]*\{'
+          check "speed-bin 117 is preserved (decimal or hexadecimal)" 'qcom,speed-bin[[:space:]]*=[[:space:]]*<[[:space:]]*(117|0x0*75)[[:space:]]*>;'
+          check "initial power level 2 is present" 'qcom,initial-pwrlevel[[:space:]]*=[[:space:]]*<[[:space:]]*(2|0x0*2)[[:space:]]*>;'
           test -s out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
           echo "GPU common table, disabled bin selector, speed-bin 117 and initial level 2 verified."
 
