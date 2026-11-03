@@ -46,7 +46,7 @@ jobs:
         run: |
           dtc -I dtb -O dts -o out/yupik.dec.dts out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
           grep -Fq 'qcom,gpu-pwrlevels {' out/yupik.dec.dts
-          ! grep -Eq '^[[:space:]]*qcom,gpu-pwrlevel-bins[[:space:]]*\\{' out/yupik.dec.dts
+          ! grep -Fq 'qcom,gpu-pwrlevel-bins {' out/yupik.dec.dts
           grep -Fq 'qcom,gpu-pwrlevel-bins-disabled {' out/yupik.dec.dts
           grep -Fq 'qcom,speed-bin = <0x75>' out/yupik.dec.dts
           grep -Fq 'qcom,initial-pwrlevel = <0x2>' out/yupik.dec.dts
