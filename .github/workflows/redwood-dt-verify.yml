@@ -24,6 +24,9 @@ jobs:
           ref: gpu-common-pwrlevels
           fetch-depth: 1
 
+      - name: Prepare kernel helper scripts
+        run: chmod +x scripts/min-tool-version.sh
+
       - name: Install host dependencies
         run: |
           sudo apt-get update
