@@ -41,9 +41,9 @@ jobs:
 
       - name: Build base DTB and Redwood overlay
         run: |
-          make O=out ARCH=arm64 -j2 \
-            arch/arm64/boot/dts/vendor/qcom/yupik.dtb \
-            arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
+          make O=out ARCH=arm64 -j2 dtbs
+          test -s out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
+          test -s out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
 
       - name: Decompile and validate GPU power-level tree
         run: |
