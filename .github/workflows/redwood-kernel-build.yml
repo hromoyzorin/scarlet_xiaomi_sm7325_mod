@@ -1,0 +1,80 @@
+name: Redwood full kernel build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gpu-common-pwrlevels
+    paths:
+      - "arch/arm64/boot/dts/vendor/qcom/**"
+      - "arch/arm64/configs/vendor/**"
+      - "drivers/**"
+      - ".github/workflows/redwood-kernel-build.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-kernel:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout kernel sources
+        uses: actions/checkout@v4
+        with:
+          ref: gpu-common-pwrlevels
+          fetch-depth: 1
+
+      - name: Install build dependencies and LLVM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex build-essential libssl-dev libelf-dev             device-tree-compiler python3 python-is-python3 ccache             clang-14 lld-14 llvm-14 gcc-aarch64-linux-gnu
+
+      - name: Configure Redwood kernel
+        run: |
+          make O=out ARCH=arm64 LLVM=-14 vendor/xiaomi-qgki_defconfig
+          scripts/kconfig/merge_config.sh -m -O out out/.config arch/arm64/configs/vendor/redwood.config
+          make O=out ARCH=arm64 LLVM=-14 olddefconfig
+          echo "=== Key configuration ==="
+          grep -E '^(CONFIG_ARCH_YUPIK|CONFIG_MACH_XIAOMI_REDWOOD|CONFIG_QCOM_KGSL|CONFIG_BUILD_ARM64_DT_OVERLAY|CONFIG_LOCALVERSION)=' out/.config
+          test "$(grep -c '^CONFIG_QCOM_KGSL=y$' out/.config)" -eq 1
+          test "$(grep -c '^CONFIG_MACH_XIAOMI_REDWOOD=y$' out/.config)" -eq 1
+
+      - name: Build kernel image, DTBs and overlays
+        run: |
+          make O=out ARCH=arm64 LLVM=-14 -j$(nproc) Image.gz dtbs
+          test -s out/arch/arm64/boot/Image
+          test -s out/arch/arm64/boot/Image.gz
+          test -s out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
+          test -s out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
+
+      - name: Verify embedded build identity and GPU DT
+        run: |
+          echo "=== Kernel release ==="
+          make O=out ARCH=arm64 LLVM=-14 kernelrelease
+          echo "=== Artifact sizes ==="
+          ls -lh out/arch/arm64/boot/Image out/arch/arm64/boot/Image.gz
+          ls -lh out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
+          ls -lh out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
+          dtc -I dtb -O dts -o out/yupik.dec.dts out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
+          grep -q 'qcom,gpu-pwrlevels {' out/yupik.dec.dts
+          grep -q 'qcom,gpu-pwrlevel-bins-disabled {' out/yupik.dec.dts
+          ! grep -q 'qcom,gpu-pwrlevel-bins {' out/yupik.dec.dts
+          grep -q 'qcom,initial-pwrlevel = <0x02>;' out/yupik.dec.dts
+          echo "GPU DT structure is present in the built DTB."
+
+      - name: Upload full kernel build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scarlet-v7-redwood-gpu-common-pwrlevels
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            out/arch/arm64/boot/Image
+            out/arch/arm64/boot/Image.gz
+            out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
+            out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
+            out/vmlinux
+            out/System.map
+            out/.config
+            out/yupik.dec.dts
