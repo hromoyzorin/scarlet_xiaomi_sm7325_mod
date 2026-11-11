@@ -1,4 +1,4 @@
-name: Scarlet Redwood stock-117 control build
+name: Scarlet Redwood stock-117 KernelSU control build
 on:
   push:
     branches: [scarlet-stock117-control]
@@ -23,7 +23,31 @@ jobs:
           scripts/kconfig/merge_config.sh -m -O out out/.config arch/arm64/configs/vendor/redwood.config
           make O=out ARCH=arm64 LLVM=-14 olddefconfig
           test "$(grep -c '^CONFIG_QCOM_KGSL=y$' out/.config)" -eq 1
-          test "$(grep -c '^CONFIG_MACH_XIAOMI_REDWOOD=y$' out/.config)" -eq 1
+          test "$(grep -c '^CONFIG_MACH_XIAOMI_REDWOOD=y
+      - name: Build Image and device trees
+        run: |
+          make O=out ARCH=arm64 LLVM=-14 -j$(nproc) Image.gz dtbs
+          test -s out/arch/arm64/boot/Image
+          test -s out/arch/arm64/boot/Image.gz
+          test -s out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
+          test -s out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scarlet-redwood-stock117-kernelsu-control
+          path: |
+            out/arch/arm64/boot/Image
+            out/arch/arm64/boot/Image.gz
+            out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
+            out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
+            out/vmlinux
+            out/System.map
+            out/.config
+          if-no-files-found: error
+          retention-days: 14
+ out/.config)" -eq 1
+          grep -qx 'CONFIG_KSU=y' out/.config
+          echo 'Verified: KernelSU built into kernel'
       - name: Build Image and device trees
         run: |
           make O=out ARCH=arm64 LLVM=-14 -j$(nproc) Image.gz dtbs
