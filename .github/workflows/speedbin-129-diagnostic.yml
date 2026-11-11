@@ -1,4 +1,5 @@
 name: Scarlet Redwood speed-bin diagnostic build
+# Re-trigger experimental branch build after workflow registration on main
 on:
   push:
     branches: [speedbin-129-test]
