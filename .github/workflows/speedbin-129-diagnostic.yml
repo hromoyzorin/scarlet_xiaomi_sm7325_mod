@@ -1,7 +1,7 @@
-name: Scarlet Redwood speed-bin diagnostic build
+name: Scarlet Redwood stock-117 control build
 on:
   push:
-    branches: [speedbin-129-test]
+    branches: [scarlet-stock117-control]
   workflow_dispatch:
   pull_request:
     branches: [main]
@@ -34,7 +34,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: scarlet-redwood-speedbin-129-diagnostic
+          name: scarlet-redwood-stock117-control
           path: |
             out/arch/arm64/boot/Image
             out/arch/arm64/boot/Image.gz
