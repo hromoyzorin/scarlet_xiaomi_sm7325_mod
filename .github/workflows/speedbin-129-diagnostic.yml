@@ -1,0 +1,45 @@
+name: Scarlet Redwood speed-bin diagnostic build
+on:
+  push:
+    branches: [speedbin-129-test]
+  workflow_dispatch:
+
+jobs:
+  build-kernel:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout diagnostic sources
+        uses: actions/checkout@v4
+      - name: Install dependencies and LLVM 14
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex build-essential libssl-dev libelf-dev device-tree-compiler python3 python-is-python3 ccache clang-14 lld-14 llvm-14 gcc-aarch64-linux-gnu
+      - name: Configure Redwood kernel
+        run: |
+          make O=out ARCH=arm64 LLVM=-14 vendor/xiaomi-qgki_defconfig
+          scripts/kconfig/merge_config.sh -m -O out out/.config arch/arm64/configs/vendor/redwood.config
+          make O=out ARCH=arm64 LLVM=-14 olddefconfig
+          test "$(grep -c '^CONFIG_QCOM_KGSL=y$' out/.config)" -eq 1
+          test "$(grep -c '^CONFIG_MACH_XIAOMI_REDWOOD=y$' out/.config)" -eq 1
+      - name: Build Image and device trees
+        run: |
+          make O=out ARCH=arm64 LLVM=-14 -j$(nproc) Image.gz dtbs
+          test -s out/arch/arm64/boot/Image
+          test -s out/arch/arm64/boot/Image.gz
+          test -s out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
+          test -s out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scarlet-redwood-speedbin-129-diagnostic
+          path: |
+            out/arch/arm64/boot/Image
+            out/arch/arm64/boot/Image.gz
+            out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
+            out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
+            out/vmlinux
+            out/System.map
+            out/.config
+          if-no-files-found: error
+          retention-days: 14
