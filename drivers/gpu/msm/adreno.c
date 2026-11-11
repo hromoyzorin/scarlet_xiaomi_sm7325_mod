@@ -1305,25 +1305,6 @@ int adreno_device_probe(struct platform_device *pdev,
 
 	device->speed_bin = status;
 
-	/*
-	 * Diagnostic experiment for Yupik / Adreno 642L only:
-	 * preserve the physical eFuse, but select the 129-bin DTS table.
-	 * This does not modify QFPROM or GMU firmware.
-	 */
-	{
-		u32 gpu_chipid = 0;
-
-		of_property_read_u32(dev->of_node, "qcom,chipid", &gpu_chipid);
-		dev_info(dev, "GPU DIAG: chipid=0x%08x efuse_speed_bin=%d\n",
-			 gpu_chipid, status);
-		if (gpu_chipid == 0x06030500 && status == 117) {
-			device->speed_bin = 129;
-			dev_warn(dev,
-				 "GPU DIAG: overriding DTS table selector 117 -> 129 (608 MHz max)\n");
-		}
-		dev_info(dev, "GPU DIAG: selected_speed_bin=%d\n",
-			 device->speed_bin);
-	}
 
 	status = adreno_of_get_power(adreno_dev, pdev);
 	if (status)
