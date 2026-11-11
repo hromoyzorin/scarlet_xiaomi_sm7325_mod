@@ -1,5 +1,5 @@
 name: Scarlet Redwood speed-bin diagnostic build
-# Re-trigger experimental branch build after workflow registration on main
+# QFPROM virtual GPU speed/model bin 129 experimental build
 on:
   push:
     branches: [qfprom-gpu-bin-129-test]
