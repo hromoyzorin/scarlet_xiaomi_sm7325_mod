@@ -3,6 +3,8 @@ on:
   push:
     branches: [speedbin-129-test]
   workflow_dispatch:
+  pull_request:
+    branches: [main]
 
 jobs:
   build-kernel:
