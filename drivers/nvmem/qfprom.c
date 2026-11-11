@@ -24,6 +24,28 @@ static int qfprom_reg_read(void *context,
 	while (words--)
 		*val++ = readb(priv->base + reg + i++);
 
+	/*
+	 * Redwood diagnostic: the speed_bin and gpu_model NVMEM cells
+	 * overlap the same 8 bits (offset 0x1e9, bits 5..12).
+	 * Change only the readback view, never the physical QFPROM.
+	 * Both cells must observe the same virtual value.
+	 */
+	if (reg <= 0x1ea && bytes && (u64)reg + bytes > 0x1e9) {
+		u16 raw = readb(priv->base + 0x1e9) |
+			(readb(priv->base + 0x1ea) << 8);
+		u16 mask = 0xff << 5;
+
+		if (((raw & mask) >> 5) == 117) {
+			u16 virtual = (raw & ~mask) | (129 << 5);
+			u8 *out = _val;
+
+			if (reg <= 0x1e9 && (u64)reg + bytes > 0x1e9)
+				out[0x1e9 - reg] = virtual & 0xff;
+			if (reg <= 0x1ea && (u64)reg + bytes > 0x1ea)
+				out[0x1ea - reg] = virtual >> 8;
+		}
+	}
+
 	return 0;
 }
 
