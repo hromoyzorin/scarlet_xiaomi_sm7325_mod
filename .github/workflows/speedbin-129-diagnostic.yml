@@ -1,7 +1,7 @@
-name: Scarlet Redwood virtual-bin129 608MHz KernelSU build
+name: Scarlet Redwood virtual-bin129 550MHz isolation build
 on:
   push:
-    branches: [scarlet-129-608-ksu-v2]
+    branches: [scarlet-129-550-isolation]
   workflow_dispatch:
 
 jobs:
@@ -23,7 +23,16 @@ jobs:
           grep -qx 'CONFIG_QCOM_KGSL=y' out/.config
           grep -qx 'CONFIG_MACH_XIAOMI_REDWOOD=y' out/.config
           grep -qx 'CONFIG_KSU=y' out/.config
-          grep -q 'qcom,gpu-freq = <608000000>;' arch/arm64/boot/dts/vendor/qcom/yupik-gpu.dtsi
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("arch/arm64/boot/dts/vendor/qcom/yupik-gpu.dtsi").read_text()
+          section = s.split("qcom,gpu-pwrlevels-4 {", 1)[1].split("qcom,gpu-pwrlevels-5 {", 1)[0]
+          assert "qcom,speed-bin = <129>;" in section
+          assert "qcom,initial-pwrlevel = <2>;" in section
+          assert "qcom,gpu-freq = <608000000>;" not in section
+          assert section.count("qcom,gpu-pwrlevel@") == 3
+          assert [f"qcom,gpu-freq = <{hz}>;" in section for hz in (550000000,450000000,315000000)] == [True]*3
+          PY
           grep -q '129 << 5' drivers/nvmem/qfprom.c
       - name: Build Image and device trees
         run: |
@@ -35,7 +44,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: scarlet-redwood-bin129-608-kernelsu
+          name: scarlet-redwood-bin129-550-isolation
           path: |
             out/arch/arm64/boot/Image
             out/arch/arm64/boot/Image.gz
