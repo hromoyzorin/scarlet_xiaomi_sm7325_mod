@@ -3,27 +3,28 @@ on:
   push:
     branches: [scarlet-129-608-ksu-v2]
   workflow_dispatch:
-  pull_request:
-    branches: [main]
 
 jobs:
   build-kernel:
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     steps:
-      - name: Checkout diagnostic sources
+      - name: Checkout sources
         uses: actions/checkout@v4
       - name: Install dependencies and LLVM 14
         run: |
           sudo apt-get update
           sudo apt-get install -y bc bison flex build-essential libssl-dev libelf-dev device-tree-compiler python3 python-is-python3 ccache clang-14 lld-14 llvm-14 gcc-aarch64-linux-gnu
-      - name: Configure Redwood kernel
+      - name: Configure Redwood kernel and verify KernelSU
         run: |
           make O=out ARCH=arm64 LLVM=-14 vendor/xiaomi-qgki_defconfig
           scripts/kconfig/merge_config.sh -m -O out out/.config arch/arm64/configs/vendor/redwood.config
           make O=out ARCH=arm64 LLVM=-14 olddefconfig
-          test "$(grep -c '^CONFIG_QCOM_KGSL=y$' out/.config)" -eq 1
-          test "$(grep -c '^CONFIG_MACH_XIAOMI_REDWOOD=y
+          grep -qx 'CONFIG_QCOM_KGSL=y' out/.config
+          grep -qx 'CONFIG_MACH_XIAOMI_REDWOOD=y' out/.config
+          grep -qx 'CONFIG_KSU=y' out/.config
+          grep -q 'qcom,gpu-freq = <608000000>;' arch/arm64/boot/dts/vendor/qcom/yupik-gpu.dtsi
+          grep -q '129 << 5' drivers/nvmem/qfprom.c
       - name: Build Image and device trees
         run: |
           make O=out ARCH=arm64 LLVM=-14 -j$(nproc) Image.gz dtbs
@@ -35,33 +36,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: scarlet-redwood-bin129-608-kernelsu
-          path: |
-            out/arch/arm64/boot/Image
-            out/arch/arm64/boot/Image.gz
-            out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
-            out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
-            out/vmlinux
-            out/System.map
-            out/.config
-          if-no-files-found: error
-          retention-days: 14
- out/.config)" -eq 1
-          grep -qx 'CONFIG_KSU=y' out/.config
-          echo 'Verified: KernelSU built into kernel'
-          grep -q 'qcom,gpu-freq = <608000000>;' arch/arm64/boot/dts/vendor/qcom/yupik-gpu.dtsi
-          grep -q '129 << 5' drivers/nvmem/qfprom.c
-          echo 'Verified: virtual bin129 and 608MHz DTS table'
-      - name: Build Image and device trees
-        run: |
-          make O=out ARCH=arm64 LLVM=-14 -j$(nproc) Image.gz dtbs
-          test -s out/arch/arm64/boot/Image
-          test -s out/arch/arm64/boot/Image.gz
-          test -s out/arch/arm64/boot/dts/vendor/qcom/yupik.dtb
-          test -s out/arch/arm64/boot/dts/vendor/qcom/redwood-sm7325-overlay.dtbo
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: scarlet-redwood-stock117-control
           path: |
             out/arch/arm64/boot/Image
             out/arch/arm64/boot/Image.gz
